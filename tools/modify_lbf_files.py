@@ -5,13 +5,13 @@ import os
 import numpy as np
 from netCDF4 import Dataset
 
-path = '/media/pick/Data/int2lm/'
+path = '/home/std/SINGAPORE/int2lm/'
 
 files = glob.glob(path + "*.nc")
 print(files)
 files.sort()
 
-nc_dcep = Dataset('/media/pick/Data/int2lm/init/laf2015062200.nc','r')
+nc_dcep = Dataset('/home/std/SINGAPORE/int2lm/init/laf2013060700.nc','r')
 FR_URBANCL = nc_dcep.variables['FR_UCLASS'][:]
 
 for fic in files:

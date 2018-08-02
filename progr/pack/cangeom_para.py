@@ -8,7 +8,6 @@ import shapefile
 from . import cluster
 from . import geometry
 from . import geo2rot
-from numba import jit
 
 
 def shp(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
@@ -98,7 +97,7 @@ def shp(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
 
     return BUILD_W, STREET_W, FR_ROOF, FR_STREETD, shapes
 
-@jit
+
 def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
                   lat_mid, dlat, dlon, FR_URBAN, FR_ROOF):
     # Inizializations
@@ -112,7 +111,7 @@ def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
     VERT_AREA = np.zeros((1, udir_d, rlat_d, rlon_d))
     # Read the dataset
     sf = shapefile.Reader(sf_path)
-    shapes = sf.shapeRecords()
+    shapes = sf.shapes()
     # Calculations
     area_grid = geometry.surface_element_earth(dlat, dlon, lat_mid)
     print("dlat: {}, dlon: {}, lat_mid: {}".format(dlat, dlon, lat_mid))
@@ -121,13 +120,14 @@ def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
     for x in range(0, N):
         print(x)
         # Reading Geometry
-        hgt = shapes[x].record[-5]
+        shape = shapes[x]
+        hgt = sf.record(x)[-5]
         if hgt < 1e-1:
             continue
-        p = shapes[x].shape.points
+        p = shape.points
         p = np.array(p)
         # Reading the Area (horizontal)
-        area = shapes[x].record[-1]
+        area = sf.record(x)[-1]
         # Calculating the coordinates of the centroid of the polygon
         lonC = np.mean(p[:, 0])
         latC = np.mean(p[:, 1])
@@ -154,7 +154,7 @@ def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
             VERT_AREA[0, ang_class, lat_idx, lon_idx] += vert_area
             # Allocating the building area by direction and height
             FR_ROOF[0, ang_class, hgt_class, lat_idx, lon_idx] += vert_area
-
+    
     np.seterr(divide='ignore')  # disabled division by 0 warning
     FR_BUILD = (AREA_BLD[0, :, :] / area_grid)
     print("area_grid: {}".format(area_grid))
@@ -184,7 +184,7 @@ def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
     # STREET_W[STREET_W>100] = 100  # max aspect ration LCZ 9
 
     # Calculating and normalizing the canyon direction distribution
-    FR_ROOF[0,:,-1:-2,:,:] = 0
+    #FR_ROOF[0,:,-1:-2,:,:] = 0
 
     FR_STREETD = np.sum(FR_ROOF, 2)
     norm_streetd = np.sum(FR_STREETD, 1)
@@ -209,7 +209,7 @@ def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
 #        for j in range (rlat_d):
 #            if FR_ROOF[0,:,:,i,j].sum() < 1e-5:
 #                FR_URBAN[0,i,j] = 0
-    FR_ROOF[0,:,0,:,:] = 0
+    #FR_ROOF[0,:,0,:,:] = 0
     FR_ROOF[FR_ROOF < 0] = 0  # to avoid negative values
     print(FR_URBAN[0, :, :].max())
     

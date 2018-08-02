@@ -8,12 +8,17 @@ import copy
 import numpy as np
 from netCDF4 import Dataset
 import shapefile
-import gdal
+#import gdal
 
 import pack.urbfrac as urbfrac
 import pack.cangeom as cangeom
 import pack.veget as veget
 import pack.tools as tools
+
+try:
+    import yaml
+except:
+    raise ImportError("Please install pyyaml by issuing 'pip install pyyaml'")
 
 ## USER DEFINED PATHS AND PARAMETERS
 
@@ -21,13 +26,17 @@ import pack.tools as tools
 LAD_flag = 0 # calculate LAD
 threshold = 1 # for urban fraction
 thr_val = 0.4 
+CALC_WITHOUT_URBFRAC = 1
+
+
+
 
 # Height cluster
 new_approach = 0 # if 1, kees fr_roof 0 at the ground
 
 # Path to datasets
-nc_path = '/project/mugi/nas/PAPER2/CCLM-DCEP-Tree/int2lm/laf2015062200.nc'
-sf_path = '/project/mugi/nas/PAPER2/datasets/buildings/geom/3dbuildings_masked_geom.shp'
+nc_path = '/home/std/SINGAPORE/int2lm/laf2013060700.nc'
+sf_path = '/home/std/SINGAPORE/INPUT/buildings/whole_sg_wgs84.shp'
 ufrac_path = '/project/mugi/nas/PAPER2/datasets/land_use/mosaic_20m_sealing_v2_WGS_cutted.tif'
 veg_path = '/project/mugi/nas/PAPER2/datasets/trees/VEG_WGS84.tif'
 
@@ -43,8 +52,8 @@ nc = Dataset(nc_path, 'a')
 rlon_d = len(nc.dimensions['rlon'])
 rlat_d = len(nc.dimensions['rlat'])
 time_d = len(nc.dimensions['time'])
-udir_d = 4 
-uheight1_d = 13
+#udir_d = 4 
+#uheight1_d = 13
 uclass_d = 1
 
 # Importing variables
@@ -52,16 +61,28 @@ rlon_v = nc.variables['rlon'][:]
 rlat_v = nc.variables['rlat'][:]
 lon_v = nc.variables['lon'][:]
 lat_v = nc.variables['lat'][:]
+lat_vec = nc.variables["lat"][:,0]
+lon_vec = nc.variables["lon"][0,:]
+lat_mid =  lat_vec[len(lat_vec)//2]
+dlon = lon_vec[len(lon_vec)//2] - lon_vec[(len(lon_vec)//2)-1]
+dlat = lat_vec[len(lat_vec)//2] - lat_vec[(len(lat_vec)//2)-1]
+
+print(dlon, dlat, lat_mid)
+#input()
+
 udir_v = np.array([-45, 0, 45, 90], dtype=np.float32)
+udir_d = len(udir_v)
 #uheight1_v = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100], dtype=np.float32)
-uheight1_v = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60], dtype=np.float32)
+#uheight1_v = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60], dtype=np.float32)
+uheight1_v = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70], dtype=np.float32)
+uheight1_d = len(uheight1_v)
 
 # Writing dimensions to the new netCDF
 udir = nc.createDimension('udir',udir_d)
 uheight1 = nc.createDimension('uheight1',uheight1_d)
 uclass = nc.createDimension('uclass',uclass_d)
 
-# Writing variables 
+# Writing variables
 udir = nc.createVariable('udir','f4',('udir',))
 uheight1 = nc.createVariable('uheight1','f4',('uheight1'))
 uclass = nc.createVariable('uclass','f4',('uclass',))
@@ -89,19 +110,26 @@ PLCOV_2 = nc.variables['PLCOV'][:]
 ## CALCULATIONS
 
 # Extracting the urban fraction
-print('Extracting the urban fraction')
-[FR_URBAN, data1, lat_s_1, lon_s_1] = urbfrac.wgs(ufrac_path, threshold, thr_val, rlat_v, rlon_v, FR_URBAN) 
 
-# Calculating the street canyon geometry parameters
-print('Calculating canyon parameters')
-[BUILD_W, STREET_W, FR_ROOF, FR_STREETD, shapes] = cangeom.shp(sf_path, rlat_d, rlon_d, udir_d, \
+if not CALC_WITHOUT_URBFRAC:
+    print('Extracting the urban fraction')
+    [FR_URBAN, data1, lat_s_1, lon_s_1] = urbfrac.wgs(ufrac_path, threshold, thr_val, rlat_v, rlon_v, FR_URBAN)
+    [BUILD_W, STREET_W, FR_ROOF, FR_STREETD, shapes] = cangeom.shp(sf_path, rlat_d, rlon_d, udir_d, \
         uheight1_d, rlat_v, rlon_v, FR_URBAN, FR_ROOF)
 
+else: 
+    print('Calc without urban fraction....')
+    BUILD_W, STREET_W, FR_ROOF, FR_STREETD, FR_URBAN, shapes = cangeom.shp_alternate(sf_path, rlat_d, rlon_d, udir_d, \
+        uheight1_d, rlat_v, rlon_v, lat_mid, dlat, dlon,  FR_URBAN ,FR_ROOF)
+
+
+# Calculating the street canyon geometry parameters
 # Calculating the leaf area density
+print(FR_URBAN)
 if LAD_flag==1:
     print('Calculating vegetation density')
     [LAD_C,OMEGA,LAI_URB] = veget.lidar(veg_path, thr_val, data1, rlat_v, rlon_v, lat_s_1, lon_s_1, LAD_C, OMEGA, LAI_URB)
-
+OMEGA[0,:,:] = 0.5
 ## MASKING NON-URBAN CELLS
 print('Masking the urban cells')
 # Defining the urban class mask
@@ -119,15 +147,17 @@ FR_ROOF_mask[FR_ROOF_mask>0.01] = 1
 FR_URBANCL[FR_ROOF_mask != 1] = 0
 
 # Debug: removing grid cells with issues
-FR_URBANCL[0,107-1,151-1] = 0
-FR_URBANCL[0,120-1,179-1] = 0
+#FR_URBANCL[0,107-1,151-1] = 0
+#FR_URBANCL[0,120-1,179-1] = 0
 
 # Updating the mask with LAD values
 if LAD_flag==1:
     LAD_mask = copy.deepcopy(LAD_C[:,0,1,:,:])
     LAD_mask[LAD_mask>0.0001] = 1
     FR_URBANCL[LAD_mask != 1] = 0
-
+if CALC_WITHOUT_URBFRAC:
+    pass
+    #FR_URBANCL[0,:,:] = 1
 mask2D = FR_URBANCL
 mask3D[:,:,:,:] = FR_URBANCL[0,np.newaxis,:,:]
 mask4D[:,:,:,:,:] = FR_URBANCL[0,np.newaxis,np.newaxis,:,:]
@@ -148,8 +178,9 @@ LAI_2[FR_URBANCL == 1] = 1 # to account for grass
 Z0_2[FR_URBANCL == 1] = 0.1
 
 # Adding non-street treesa
-LAI_URB[mask2D != 1] = 0 # only vegetation on urban cells
-LAI_2 = LAI_2 + LAI_URB
+if LAD_flag:
+    LAI_URB[mask2D != 1] = 0 # only vegetation on urban cells
+    LAI_2 = LAI_2 + LAI_URB
 
 ## WRITING BACK TO NETCDF
 print('Writing variables to netCDF')
@@ -165,9 +196,9 @@ lad_b = nc.createVariable('LAD_B','f4',('uclass','udir','uheight1','rlat','rlon'
 omega_r = nc.createVariable('OMEGA_R','f4',('uclass','rlat','rlon'),fill_value=-999)
 omega_d = nc.createVariable('OMEGA_D','f4',('uclass','rlat','rlon'),fill_value=-999)
 
-lai_2 = nc.createVariable('LAI_2','f4',('time','rlat','rlon'))
-plcov_2 = nc.createVariable('PLCOV_2','f4',('time','rlat','rlon'))
-z0_2 = nc.createVariable('Z0_2','f4',('time','rlat','rlon'))
+lai_2 = nc.createVariable('LAI_2','f4',('time','rlat','rlon'),fill_value=-999)
+plcov_2 = nc.createVariable('PLCOV_2','f4',('time','rlat','rlon'),fill_value=-999)
+z0_2 = nc.createVariable('Z0_2','f4',('time','rlat','rlon'),fill_value=-999)
 
 # Writing attributes
 fr_roof.units = '1'
@@ -248,7 +279,7 @@ z0_2.long_name = 'Roughness Length for urban vegetation'
 z0_2.coordinates = 'lon lat'
 z0_2.grid_mapping = 'rotated_pole'
 
-# Inserting data into variables
+# Inserting data into variable
 fr_roof[:] = FR_ROOF
 fr_urbancl[:] = FR_URBANCL
 fr_urban[:] = FR_URBAN

@@ -52,3 +52,9 @@ def angle(array,k):
 
     return alpha
 
+def surface_element_earth(dlat, dlon, lat):
+    r = 6371000
+    dlat_rad = np.deg2rad(dlat)
+    dlon_rad = np.deg2rad(dlon)
+    lat_rad = np.deg2rad(lat) + (np.pi/2)
+    return r**2 * np.sin(lat_rad) * dlat_rad * dlon_rad
