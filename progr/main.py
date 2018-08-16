@@ -35,8 +35,8 @@ CALC_WITHOUT_URBFRAC = 1
 new_approach = 0 # if 1, kees fr_roof 0 at the ground
 
 # Path to datasets
-nc_path = '/home/std/SINGAPORE/int2lm/laf2013060700.nc'
-sf_path = '/home/std/SINGAPORE/INPUT/buildings/whole_sg_wgs84.shp'
+nc_path = '/scratch/snx3000/dstrebel/int2lm/output_NEST2/laf2013060700.nc'
+sf_path = '/scratch/snx3000/dstrebel/Singapore/INPUT/buildings/whole_sg_wgs84.shp'
 ufrac_path = '/project/mugi/nas/PAPER2/datasets/land_use/mosaic_20m_sealing_v2_WGS_cutted.tif'
 veg_path = '/project/mugi/nas/PAPER2/datasets/trees/VEG_WGS84.tif'
 

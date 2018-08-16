@@ -1,20 +1,18 @@
 #!python
 
+from multiprocessing import Pool
+import itertools
 import glob
 import os
 import numpy as np
 from netCDF4 import Dataset
 
-path = '/home/std/SINGAPORE/int2lm/'
+def wrapper(arg):
+    """Convert `f([1,2])` to `f(1,2)` call."""
+    return processFiles(*arg)
 
-files = glob.glob(path + "*.nc")
-print(files)
-files.sort()
 
-nc_dcep = Dataset('/home/std/SINGAPORE/int2lm/init/laf2013060700.nc','r')
-FR_URBANCL = nc_dcep.variables['FR_UCLASS'][:]
-
-for fic in files:
+def processFiles(fic, FR_URBANCL):
     print("Working on {}".format(fic))
     f = Dataset(fic, 'a', format='NETCDF4')
     lai = f.variables['LAI'][:]
@@ -41,6 +39,18 @@ for fic in files:
     plcov_2.grid_mapping = 'rotated_pole'
         # Closing netCDF
     f.close()
+
+
+path = '/scratch/snx3000/dstrebel/int2lm/output_NEST2/'
+
+files = glob.glob(path + "lbf*")
+print(files)
+files.sort()
+
+nc_dcep = Dataset('/scratch/snx3000/dstrebel/int2lm/output_NEST2/laf2013060700.nc','r')
+FR_URBANCL = nc_dcep.variables['FR_UCLASS'][:]
+pool = Pool()
+pool.map(wrapper, zip(files, itertools.repeat(FR_URBANCL)))
 
 nc_dcep.close()
 

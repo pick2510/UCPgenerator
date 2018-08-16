@@ -8,7 +8,7 @@ import shapefile
 from . import cluster
 from . import geometry
 from . import geo2rot
-from numba import jit
+#from numba import jit
 
 
 def shp(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
@@ -98,7 +98,6 @@ def shp(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
 
     return BUILD_W, STREET_W, FR_ROOF, FR_STREETD, shapes
 
-@jit
 def shp_alternate(sf_path, rlat_d, rlon_d, udir_d, uheight1_d, rlat_v, rlon_v,
                   lat_mid, dlat, dlon, FR_URBAN, FR_ROOF):
     # Inizializations

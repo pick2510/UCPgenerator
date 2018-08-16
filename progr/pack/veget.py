@@ -3,7 +3,7 @@
 # python
 
 import numpy as np
-import gdal
+#import gdal
 import shapefile
 
 from . import geo2rot
